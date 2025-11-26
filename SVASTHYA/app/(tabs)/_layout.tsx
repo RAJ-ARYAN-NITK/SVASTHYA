@@ -37,7 +37,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Colors from '@/constants/Colors'; // Assuming you have a Colors constant file, adjust if not
+import { Colors } from '@/constants/Colors'; // Use named import; // Assuming you have a Colors constant file, adjust if not
 import { useColorScheme } from '@/components/useColorScheme'; // Standard hook in Expo Router templates
 
 // Define icon type for safety
