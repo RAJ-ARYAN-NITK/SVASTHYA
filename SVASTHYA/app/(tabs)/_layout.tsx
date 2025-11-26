@@ -1,39 +1,3 @@
-// import { Tabs } from 'expo-router';
-// import React from 'react';
-
-// import { HapticTab } from '@/components/haptic-tab';
-// import { IconSymbol } from '@/components/ui/icon-symbol';
-// import { Colors } from '@/constants/theme';
-// import { useColorScheme } from '@/hooks/use-color-scheme';
-
-// export default function TabLayout() {
-//   const colorScheme = useColorScheme();
-
-//   return (
-//     <Tabs
-//       screenOptions={{
-//         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-//         headerShown: false,
-//         tabBarButton: HapticTab,
-//       }}>
-//       <Tabs.Screen
-//         name="index"
-//         options={{
-//           title: 'Home',
-//           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-//         }}
-//       />
-//       <Tabs.Screen
-//         name="explore"
-//         options={{
-//           title: 'Explore',
-//           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-//         }}
-//       />
-//     </Tabs>
-//   );
-// }
-// app/(tabs)/_layout.tsx
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,14 +37,14 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="folder-outline" color={color} />,
         }}
       />
-       <Tabs.Screen
+      <Tabs.Screen
         name="aiAgent" // Corresponds to aiAgent.tsx (create this file)
         options={{
           title: 'AI Agent',
           tabBarIcon: ({ color }) => <TabBarIcon name="hardware-chip-outline" color={color} />,
         }}
       />
-       <Tabs.Screen
+      <Tabs.Screen
         name="insights" // Corresponds to insights.tsx (create this file)
         options={{
           title: 'Insights',
