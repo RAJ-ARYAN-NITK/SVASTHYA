@@ -1,12 +1,32 @@
-import { useSignIn } from '@clerk/clerk-expo';
+
+import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import { Text, TextInput, View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import React from 'react';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSession } from '@/ctx';
+import * as WebBrowser from 'expo-web-browser';
+import { useOAuth } from '@clerk/clerk-expo';
+import * as Linking from 'expo-linking';
+
+export const useWarmUpBrowser = () => {
+    React.useEffect(() => {
+        // Warm up the android browser to improve UX
+        // https://docs.expo.dev/guides/authentication/#improving-user-experience
+        void WebBrowser.warmUpAsync();
+        return () => {
+            void WebBrowser.coolDownAsync();
+        };
+    }, []);
+};
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
-    const { signIn, setActive, isLoaded } = useSignIn();
+    useWarmUpBrowser();
+    const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+    const { signIn } = useSession();
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
@@ -16,30 +36,45 @@ export default function SignInScreen() {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState('');
 
-    const onSignInPress = React.useCallback(async () => {
-        if (!isLoaded) {
+    const onSignInPress = async () => {
+        if (!emailAddress || !password) {
+            setError('Please enter both email and password');
             return;
         }
+
         setLoading(true);
         setError('');
 
         try {
-            const completeSignIn = await signIn.create({
-                identifier: emailAddress,
-                password,
-            });
-
-            // This is an important step,
-            // This indicates the user is signed in
-            await setActive({ session: completeSignIn.createdSessionId });
+            await signIn(emailAddress, password);
             router.replace('/(tabs)');
         } catch (err: any) {
-            console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || 'Failed to sign in');
+            setError(err.response?.data?.message || 'Login failed');
         } finally {
             setLoading(false);
         }
-    }, [isLoaded, emailAddress, password]);
+    };
+
+    const onGoogleSignInPress = React.useCallback(async () => {
+        try {
+            const redirectUrl = Linking.createURL('/(tabs)', { scheme: 'svasthya' });
+            console.log('Generated Redirect URL:', redirectUrl);
+
+            const { createdSessionId, setActive } = await startOAuthFlow({
+                redirectUrl,
+            });
+
+            if (createdSessionId) {
+                setActive!({ session: createdSessionId });
+                router.replace('/(tabs)');
+            } else {
+                // Use signIn or signUp for next steps such as MFA
+            }
+        } catch (err) {
+            console.error('OAuth error', err);
+            setError('Google Sign In failed');
+        }
+    }, []);
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -72,7 +107,7 @@ export default function SignInScreen() {
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.button, { backgroundColor: theme.tint }]}
+                    style={[styles.button, { backgroundColor: theme.primary }]}
                     onPress={onSignInPress}
                     disabled={loading}
                 >
@@ -81,6 +116,20 @@ export default function SignInScreen() {
                     ) : (
                         <Text style={styles.buttonText}>Sign In</Text>
                     )}
+                </TouchableOpacity>
+
+                <View style={styles.divider}>
+                    <View style={[styles.line, { backgroundColor: theme.icon }]} />
+                    <Text style={[styles.orText, { color: theme.icon }]}>OR</Text>
+                    <View style={[styles.line, { backgroundColor: theme.icon }]} />
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.button, { backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', flexDirection: 'row', gap: 10 }]}
+                    onPress={onGoogleSignInPress}
+                >
+                    <Ionicons name="logo-google" size={20} color="black" />
+                    <Text style={[styles.buttonText, { color: 'black' }]}>Sign in with Google</Text>
                 </TouchableOpacity>
 
                 <View style={styles.footer}>
@@ -92,7 +141,7 @@ export default function SignInScreen() {
                     </Link>
                 </View>
             </View>
-        </View>
+        </View >
     );
 }
 
@@ -153,5 +202,17 @@ const styles = StyleSheet.create({
         color: 'red',
         marginBottom: 16,
         textAlign: 'center',
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    line: {
+        flex: 1,
+        height: 1,
+    },
+    orText: {
+        marginHorizontal: 10,
     },
 });

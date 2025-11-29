@@ -16,11 +16,13 @@ app.use(morgan('dev'));
 
 // Routes
 import agentRoutes from './routes/agent.routes';
+import authRoutes from './routes/auth.routes';
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Svasthya Backend is running' });
 });
 
 app.use('/api/agent', agentRoutes);
+app.use('/api/auth', authRoutes);
 
 export default app;

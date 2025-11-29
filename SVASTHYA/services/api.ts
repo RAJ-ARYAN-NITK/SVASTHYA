@@ -1,7 +1,10 @@
 import axios from 'axios';
 
-const API_URL = 'http://10.0.2.2:3000/api'; // Use 10.0.2.2 for Android Emulator, localhost for iOS Simulator
-// const API_URL = 'http://localhost:3000/api'; // Uncomment for iOS Simulator
+import { Platform } from 'react-native';
+
+const API_URL = Platform.OS === 'android'
+    ? 'http://10.0.2.2:3000/api'
+    : 'http://localhost:3000/api';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -26,6 +29,46 @@ export const analyzeReport = async (reportText: string) => {
         return response.data.analysis;
     } catch (error) {
         console.error('Error analyzing report:', error);
+        throw error;
+    }
+};
+
+export const register = async (userData: any) => {
+    try {
+        const response = await api.post('/auth/register', userData);
+        return response.data;
+    } catch (error) {
+        console.error('Error registering user:', error);
+        throw error;
+    }
+};
+
+export const login = async (userData: any) => {
+    try {
+        const response = await api.post('/auth/login', userData);
+        return response.data;
+    } catch (error) {
+        console.error('Error logging in:', error);
+        throw error;
+    }
+};
+
+export const googleLogin = async (token: string) => {
+    try {
+        const response = await api.post('/auth/google', { token });
+        return response.data;
+    } catch (error) {
+        console.error('Error logging in with Google:', error);
+        throw error;
+    }
+};
+
+export const syncUser = async (userData: { name: string; email: string; googleId: string }) => {
+    try {
+        const response = await api.post('/auth/sync', userData);
+        return response.data;
+    } catch (error) {
+        console.error('Error syncing user:', error);
         throw error;
     }
 };

@@ -1,150 +1,155 @@
 import * as React from 'react';
 import { Text, TextInput, View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useSignUp } from '@clerk/clerk-expo';
 import { useRouter, Link } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Ionicons } from '@expo/vector-icons';
+import { useSession } from '@/ctx';
+import { register, googleLogin } from '@/services/api';
+import * as WebBrowser from 'expo-web-browser';
+import { useOAuth } from '@clerk/clerk-expo';
+import * as Linking from 'expo-linking';
+
+export const useWarmUpBrowser = () => {
+    React.useEffect(() => {
+        // Warm up the android browser to improve UX
+        // https://docs.expo.dev/guides/authentication/#improving-user-experience
+        void WebBrowser.warmUpAsync();
+        return () => {
+            void WebBrowser.coolDownAsync();
+        };
+    }, []);
+};
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignUpScreen() {
-    const { isLoaded, signUp, setActive } = useSignUp();
+    useWarmUpBrowser();
+    const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+    const { signIn } = useSession();
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
 
+    const [name, setName] = React.useState('');
     const [emailAddress, setEmailAddress] = React.useState('');
     const [password, setPassword] = React.useState('');
-    const [pendingVerification, setPendingVerification] = React.useState(false);
-    const [code, setCode] = React.useState('');
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState('');
 
     const onSignUpPress = async () => {
-        if (!isLoaded) {
+        if (!name || !emailAddress || !password) {
+            setError('Please fill in all fields');
             return;
         }
+
         setLoading(true);
         setError('');
 
         try {
-            await signUp.create({
-                emailAddress,
-                password,
-            });
-
-            await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-
-            setPendingVerification(true);
-        } catch (err: any) {
-            console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || 'Failed to sign up');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const onPressVerify = async () => {
-        if (!isLoaded) {
-            return;
-        }
-        setLoading(true);
-        setError('');
-
-        try {
-            const completeSignUp = await signUp.attemptEmailAddressVerification({
-                code,
-            });
-
-            await setActive({ session: completeSignUp.createdSessionId });
+            await register({ name, email: emailAddress, password });
+            await signIn(emailAddress, password);
             router.replace('/(tabs)');
         } catch (err: any) {
-            console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || 'Failed to verify code');
+            setError(err.response?.data?.message || 'Registration failed');
         } finally {
             setLoading(false);
         }
     };
+
+    const onGoogleSignUpPress = React.useCallback(async () => {
+        try {
+            const { createdSessionId, setActive } = await startOAuthFlow({
+                redirectUrl: Linking.createURL('/(tabs)', { scheme: 'svasthya' }),
+            });
+
+            if (createdSessionId) {
+                setActive!({ session: createdSessionId });
+                router.replace('/(tabs)');
+            } else {
+                // Use signIn or signUp for next steps such as MFA
+            }
+        } catch (err) {
+            console.error('OAuth error', err);
+            setError('Google Sign Up failed');
+        }
+    }, []);
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={styles.formContainer}>
                 <Text style={[styles.title, { color: theme.text }]}>
-                    {pendingVerification ? 'Verify Email' : 'Create Account'}
+                    Create Account
                 </Text>
 
                 {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-                {!pendingVerification && (
-                    <>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                autoCapitalize="none"
-                                value={emailAddress}
-                                placeholder="Email"
-                                placeholderTextColor="#999"
-                                onChangeText={(email) => setEmailAddress(email)}
-                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                            />
-                        </View>
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        value={name}
+                        placeholder="Full Name"
+                        placeholderTextColor="#999"
+                        onChangeText={(text) => setName(text)}
+                        style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                    />
+                </View>
 
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                value={password}
-                                placeholder="Password"
-                                placeholderTextColor="#999"
-                                secureTextEntry={true}
-                                onChangeText={(password) => setPassword(password)}
-                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                            />
-                        </View>
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        autoCapitalize="none"
+                        value={emailAddress}
+                        placeholder="Email"
+                        placeholderTextColor="#999"
+                        onChangeText={(email) => setEmailAddress(email)}
+                        style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                    />
+                </View>
 
-                        <TouchableOpacity
-                            style={[styles.button, { backgroundColor: theme.tint }]}
-                            onPress={onSignUpPress}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <Text style={styles.buttonText}>Sign Up</Text>
-                            )}
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        value={password}
+                        placeholder="Password"
+                        placeholderTextColor="#999"
+                        secureTextEntry={true}
+                        onChangeText={(password) => setPassword(password)}
+                        style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                    />
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.button, { backgroundColor: theme.primary }]}
+                    onPress={onSignUpPress}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.buttonText}>Sign Up</Text>
+                    )}
+                </TouchableOpacity>
+
+                <View style={styles.divider}>
+                    <View style={[styles.line, { backgroundColor: theme.icon }]} />
+                    <Text style={[styles.orText, { color: theme.icon }]}>OR</Text>
+                    <View style={[styles.line, { backgroundColor: theme.icon }]} />
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.button, { backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', flexDirection: 'row', gap: 10 }]}
+                    onPress={onGoogleSignUpPress}
+                >
+                    <Ionicons name="logo-google" size={20} color="black" />
+                    <Text style={[styles.buttonText, { color: 'black' }]}>Sign up with Google</Text>
+                </TouchableOpacity>
+
+                <View style={styles.footer}>
+                    <Text style={{ color: theme.text }}>Already have an account? </Text>
+                    <Link href="/sign-in" asChild>
+                        <TouchableOpacity>
+                            <Text style={[styles.link, { color: theme.tint }]}>Sign In</Text>
                         </TouchableOpacity>
-
-                        <View style={styles.footer}>
-                            <Text style={{ color: theme.text }}>Already have an account? </Text>
-                            <Link href="/sign-in" asChild>
-                                <TouchableOpacity>
-                                    <Text style={[styles.link, { color: theme.tint }]}>Sign In</Text>
-                                </TouchableOpacity>
-                            </Link>
-                        </View>
-                    </>
-                )}
-
-                {pendingVerification && (
-                    <>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                value={code}
-                                placeholder="Verification Code"
-                                placeholderTextColor="#999"
-                                onChangeText={(code) => setCode(code)}
-                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                            />
-                        </View>
-
-                        <TouchableOpacity
-                            style={[styles.button, { backgroundColor: theme.tint }]}
-                            onPress={onPressVerify}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <Text style={styles.buttonText}>Verify Email</Text>
-                            )}
-                        </TouchableOpacity>
-                    </>
-                )}
+                    </Link>
+                </View>
             </View>
         </View>
     );
@@ -202,5 +207,17 @@ const styles = StyleSheet.create({
         color: 'red',
         marginBottom: 16,
         textAlign: 'center',
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    line: {
+        flex: 1,
+        height: 1,
+    },
+    orText: {
+        marginHorizontal: 10,
     },
 });
